@@ -1,0 +1,85 @@
+local energyCellStored = 0
+local maxEnergy = 0
+local enginesOn = false
+local freq = colors.white
+local names = peripheral.wrap('left').getNamesRemote()
+local c = colors.combine()
+
+local highWaterMark = .95
+local lowWaterMark  = .75
+
+local function doKeyboard()
+  print("Starting keyboard handler...")
+  while true do
+    local event, key = os.pullEvent("char")
+    if string.lower(key) == "q" then
+      break
+    end
+  end
+  print("Keyboard handler exiting.")
+end
+
+local function doMenu()
+  print("Displaying menu")
+  local lastEnergyStored = 0
+  while true do
+    sleep(1)
+    term.clear()
+    term.setCursorPos(1,1)
+    print(string.format("Energy stored: %d/%d (%d%%)", energyCellStored, maxEnergy, energyCellStored / maxEnergy * 100))
+    print(string.format("Energy thresholds low %d%% high: %d%%", lowWaterMark * 100, highWaterMark * 100))
+    print(string.format("Current charge rate: %dMJ/t", (energyCellStored - lastEnergyStored) / 20))
+    print(string.format("Engine Status: %s", enginesOn and "ON" or "OFF"))
+    print("Press Q to exit")
+    lastEnergyStored = energyCellStored
+  end
+  print("Menu handler exiting")
+end
+
+local function stop()
+  c = colors.subtract(c,freq)
+  rs.setBundledOutput('right', c)
+  enginesOn = false
+end
+
+local function start()
+  c = colors.combine(c, freq)
+  rs.setBundledOutput('right', c)
+  enginesOn = true
+end
+
+local function doEnergyCheck() 
+  while true do
+    energyCellStored = 0
+    maxEnergy = 0
+    for _,side in pairs(names) do
+      if peripheral.getType(side) == "redstone_energy_cell" then 
+        local energyCell = peripheral.wrap(side)
+        local data = energyCell.getPowerProvider()
+        energyCellStored = energyCellStored + data.energyStored
+        maxEnergy = maxEnergy + data.maxEnergyStored
+      else
+        energyCell = nil
+      end
+    end
+    if energyCellStored == 0 then
+      stop()
+      print("No energy cell detected.")
+    else
+      local energyLevel = (energyCellStored / maxEnergy)
+      if(energyLevel < lowWaterMark) and not enginesOn then
+        start()
+      elseif (energyLevel >= highWaterMark) and enginesOn then
+        stop()
+      end
+    end
+    sleep(1)
+  end
+  print("Energy handler exiting.")
+end
+
+stop()
+
+parallel.waitForAny(doKeyboard,doMenu,doEnergyCheck)
+
+stop()
