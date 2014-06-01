@@ -1,0 +1,4 @@
+local modemSide = 'left'
+local cableSide = 'back'
+local enginesOn = false
+local names = peripheral.wrap(modemSide).getNamesRemote()
